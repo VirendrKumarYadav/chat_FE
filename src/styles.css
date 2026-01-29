@@ -1,0 +1,141 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+.app {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1d2671, #c33764);
+  color: white;
+  padding: 20px;
+}
+
+.top-controls input,
+.top-controls button {
+  margin-right: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  border: none;
+}
+
+.top-controls button {
+  background: #00c853;
+  color: black;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.main {
+  display: flex;
+  margin-top: 20px;
+  gap: 20px;
+}
+
+.videos video {
+  width: 260px;
+  border-radius: 10px;
+  border: 2px solid white;
+  margin-bottom: 10px;
+}
+
+.chat {
+  background: #111;
+  border-radius: 12px;
+  padding: 10px;
+  width: 350px;
+}
+
+.chat-box {
+  height: 260px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.msg {
+  padding: 6px 10px;
+  border-radius: 10px;
+  margin-bottom: 6px;
+  max-width: 90%;
+}
+
+.msg.me {
+  background: #00c853;
+  color: black;
+  align-self: flex-end;
+}
+
+.msg.peer {
+  background: #333;
+}
+
+.chat-input {
+  display: flex;
+  gap: 6px;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 8px;
+  border-radius: 6px;
+  border: none;
+}
+
+.chat-input button {
+  background: #2979ff;
+  color: white;
+  border-radius: 6px;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+}
+
+/* TOAST */
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #00c853;
+  color: black;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-weight: bold;
+}
+.toast.error {
+  background: #d50000;
+  color: white;
+}
+
+/* ------------------- MOBILE MEDIA QUERIES ------------------- */
+@media screen and (max-width: 768px) {
+  .main {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .top-controls {
+    flex-direction: column;
+  }
+
+  .chat-input input,
+  .chat-input button {
+    flex: 1 1 100%;
+  }
+
+  .chat-box {
+    height: 200px;
+  }
+
+  .videos video {
+    width: 100%;
+  }
+}
+/* ------------------------------------------------------------ */
+
+.chat-box {
+  flex: 1;
+  height: 260px;
+  overflow-y: auto; /* scrollable */
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+}
