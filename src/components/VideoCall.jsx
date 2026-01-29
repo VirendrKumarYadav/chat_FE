@@ -20,7 +20,7 @@ export default function Video() {
     }, [messages]);
     /* ---------------- CONNECT ---------------- */
     function connect() {
-        socketRef.current = new WebSocket("ws://localhost:8080");
+        socketRef.current = new WebSocket("https://chat-be-2wla.onrender.com");
 
         socketRef.current.onopen = () => {
             socketRef.current.send(JSON.stringify({
