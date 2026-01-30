@@ -1,9 +1,9 @@
-import { useRef, useState,useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 
 export default function Video() {
     const socketRef = useRef(null);
     const peerRef = useRef(null);
-  const chatBoxRef = useRef(null);
+    const chatBoxRef = useRef(null);
     const localVideo = useRef(null);
     const remoteVideo = useRef(null);
 
@@ -12,8 +12,8 @@ export default function Video() {
     const [chatInput, setChatInput] = useState("");
     const [messages, setMessages] = useState([]);
     const [toast, setToast] = useState("");
-  
-  useEffect(() => {
+
+    useEffect(() => {
         if (chatBoxRef.current) {
             chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
         }
@@ -28,7 +28,7 @@ export default function Video() {
                 username
             }));
 
-            showToast(`🟢 ${username} is online`);
+            showToast(`🟢 ${username} is online`)
         };
 
         socketRef.current.onmessage = async (event) => {
@@ -60,7 +60,7 @@ export default function Video() {
     /* ---------------- TOAST ---------------- */
     function showToast(msg) {
         setToast(msg);
-        setTimeout(() => setToast(""), 3000);
+        setTimeout(() => setToast(""), 10000);
     }
 
     /* ---------------- CHAT ---------------- */
@@ -78,7 +78,7 @@ export default function Video() {
         setChatInput("");
     }
 
-  
+
 
     /* ---------------- PEER ---------------- */
     function createPeer() {
@@ -159,11 +159,46 @@ export default function Video() {
             <h2>🎥 Sandhya Video Chat App</h2>
 
             <div className="top-controls">
-                <input placeholder="👤 Your name" onChange={e => setUsername(e.target.value)} />
-                <input placeholder="🎯 Peer name" onChange={e => setTargetUser(e.target.value)} />
+                <select
+                    value={username}
+                    onChange={(e) => {
+                        if (e.target.value === "add") {
+                            const name = prompt("Enter your name");
+                            if (name) setUsername(name);
+                        } else {
+                            setUsername(e.target.value);
+                        }
+                    }}
+                >
+                    <option value="">👤 Select your name</option>
+                    <option value="Virendra">Virendra</option>
+                    <option value="Sandhya">Sandhya</option>
+                    <option value="Suraj">Suraj</option>
+                    <option value="add">➕ Add name</option>
+                </select>
+
+                <select
+                    value={targetUser}
+                    onChange={(e) => {
+                        if (e.target.value === "add") {
+                            const name = prompt("Enter peer name");
+                            if (name) setTargetUser(name);
+                        } else {
+                            setTargetUser(e.target.value);
+                        }
+                    }}
+                >
+                    <option value="">🎯 Select peer name</option>
+                    <option value="Virendra">Virendra</option>
+                    <option value="Sandhya">Sandhya</option>
+                    <option value="Suraj">Suraj</option>
+                    <option value="add">➕ Add name</option>
+                </select>
+
                 <button onClick={connect}>Connect</button>
                 <button onClick={startCall}>Call</button>
             </div>
+
 
             <div className="main">
                 <div className="videos">
@@ -172,7 +207,7 @@ export default function Video() {
                 </div>
 
                 <div className="chat">
-                    <h3>💬 Chat</h3>
+                    {/* <h3>💬 Chat</h3> */}
 
                     <div className="chat-box" ref={chatBoxRef}>
                         {messages.slice(-5).map((m, i) => (
@@ -185,15 +220,32 @@ export default function Video() {
                         ))}
                     </div>
 
-                    <div className="chat-input">
+
+                    {/* <div className="chat-input">
                         <input
                             placeholder="Type a message 😊"
                             value={chatInput}
                             onChange={e => setChatInput(e.target.value)}
                             onKeyDown={e => e.key === "Enter" && sendChat()}
                         />
-                        <button onClick={sendChat}>Send 🚀</button>
+                        <button className="chat-button" onClick={sendChat}>Send 🚀</button>
+                    </div> */}
+
+                </div>
+                <div class="chat-input-bar">
+                    <div class="input-wrapper">
+                        <button class="icon-btn">📎</button>
+                        <input placeholder="Type a message 😊"
+                            value={chatInput}
+                            onChange={e => setChatInput(e.target.value)}
+                            onKeyDown={e => e.key === "Enter" && sendChat()} />
+                        <button class="icon-btn">📷</button>
                     </div>
+                    <button class="send-circle chat-button" id="sendBtn" onClick={sendChat}>
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="white">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </div>
