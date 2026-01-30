@@ -6,20 +6,122 @@ export default function Video() {
     const chatBoxRef = useRef(null);
     const localVideo = useRef(null);
     const remoteVideo = useRef(null);
+    const [inCall, setInCall] = useState(false);
+
 
     const [username, setUsername] = useState("");
     const [targetUser, setTargetUser] = useState("");
     const [chatInput, setChatInput] = useState("");
     const [messages, setMessages] = useState([]);
     const [toast, setToast] = useState("");
-
+    const [error, setError] = useState("");
     useEffect(() => {
         if (chatBoxRef.current) {
             chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
         }
     }, [messages]);
-    /* ---------------- CONNECT ---------------- */
+
+    /* ===========================
+     LOAD FROM LOCAL STORAGE
+  ============================ */
+    useEffect(() => {
+        const savedUsername = localStorage.getItem("username");
+        const savedTargetUser = localStorage.getItem("targetUser");
+        const savedMessages = localStorage.getItem("messages");
+
+        if (savedUsername) setUsername(savedUsername);
+        if (savedTargetUser) setTargetUser(savedTargetUser);
+        if (savedMessages) setMessages(JSON.parse(savedMessages));
+    }, []);
+
+    /* ===========================
+       SAVE TO LOCAL STORAGE
+    ============================ */
+    useEffect(() => {
+        if (username) localStorage.setItem("username", username);
+        validateUsers();
+    }, [username]);
+
+    useEffect(() => {
+        if (targetUser) localStorage.setItem("targetUser", targetUser);
+        validateUsers();
+    }, [targetUser]);
+
+    useEffect(() => {
+        localStorage.setItem("messages", JSON.stringify(messages));
+    }, [messages]);
+
+    /* ===========================
+       AUTO SCROLL CHAT
+    ============================ */
+    useEffect(() => {
+        if (chatBoxRef.current) {
+            chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+
+    /* ===========================
+      DISCONNECT CALL
+   ============================ */
+    useEffect(() => {
+        if (!socketRef.current) return;
+
+        socketRef.current.on("call-ended", () => {
+            disconnectCall();
+        });
+
+        return () => {
+            socketRef.current.off("call-ended");
+        };
+    }, []);
+
+    const disconnectCall = () => {
+        setInCall(false);
+        if (peerRef.current) {
+            peerRef.current.close();
+            peerRef.current = null;
+        }
+
+        if (localVideo.current?.srcObject) {
+            localVideo.current.srcObject.getTracks().forEach(track => track.stop());
+            localVideo.current.srcObject = null;
+        }
+
+        if (remoteVideo.current?.srcObject) {
+            remoteVideo.current.srcObject.getTracks().forEach(track => track.stop());
+            remoteVideo.current.srcObject = null;
+        }
+
+        if (socketRef.current) {
+            socketRef.current.emit("call-ended", { to: targetUser });
+        }
+        setMessages(prev => [
+            ...prev,
+            { from: "System", text: "Call disconnected" }
+        ]);
+    };
+
+    /* ===========================
+        VALIDATION
+     ============================ */
+    const validateUsers = () => {
+        if (!username || !targetUser) {
+            setError("Please select both users before connecting or calling.");
+            return false;
+        }
+        setError("");
+        return true;
+    };
+
+    /* ===========================
+       CONNECT & CALL
+    ============================ */
+
+
+    /* ---------------- SOCKET ---------------- */
     function connect() {
+        if (!validateUsers()) return;
         socketRef.current = new WebSocket("https://chat-be-2wla.onrender.com");
 
         socketRef.current.onopen = () => {
@@ -28,7 +130,7 @@ export default function Video() {
                 username
             }));
 
-            showToast(`🟢 ${username} is online`)
+            showToast(`🟢 ${username} is online`);
         };
 
         socketRef.current.onmessage = async (event) => {
@@ -116,6 +218,8 @@ export default function Video() {
 
     /* ---------------- CALL ---------------- */
     async function startCall() {
+        if (!validateUsers()) return;
+        setInCall(true);
         showToast("📞 Calling...");
         createPeer();
         await getMedia();
@@ -129,6 +233,7 @@ export default function Video() {
             to: targetUser,
             offer
         }));
+
     }
 
     async function handleOffer(data) {
@@ -197,17 +302,23 @@ export default function Video() {
 
                 <button onClick={connect}>Connect</button>
                 <button onClick={startCall}>Call</button>
+                <button onClick={disconnectCall}>Disconnect</button>
             </div>
 
 
             <div className="main">
                 <div className="videos">
-                    <video ref={localVideo} autoPlay muted />
-                    <video ref={remoteVideo} autoPlay />
+                    {inCall && (
+                        <div className="video-section">
+                            <video ref={remoteVideo} className="remote" autoPlay />
+                            <video ref={localVideo} className="local" autoPlay muted />
+                        </div>
+                    )}
                 </div>
 
                 <div className="chat">
                     {/* <h3>💬 Chat</h3> */}
+                    {error && <div className="error-msg">{error}</div>}
 
                     <div className="chat-box" ref={chatBoxRef}>
                         {messages.slice(-5).map((m, i) => (
