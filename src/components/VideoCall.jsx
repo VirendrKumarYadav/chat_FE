@@ -6,8 +6,9 @@ export default function Video() {
     const chatBoxRef = useRef(null);
     const localVideo = useRef(null);
     const remoteVideo = useRef(null);
-    const [inCall, setInCall] = useState(false);
 
+    const [inCall, setInCall] = useState(false);
+    const [incomingCall, setIncomingCall] = useState(null); // 👈 NEW
 
     const [username, setUsername] = useState("");
     const [targetUser, setTargetUser] = useState("");
@@ -15,28 +16,25 @@ export default function Video() {
     const [messages, setMessages] = useState([]);
     const [toast, setToast] = useState("");
     const [error, setError] = useState("");
+
+    /* ================= SCROLL CHAT ================= */
     useEffect(() => {
         if (chatBoxRef.current) {
             chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
         }
     }, [messages]);
 
-    /* ===========================
-     LOAD FROM LOCAL STORAGE
-  ============================ */
+    /* ================= LOCAL STORAGE ================= */
     useEffect(() => {
-        const savedUsername = localStorage.getItem("username");
-        const savedTargetUser = localStorage.getItem("targetUser");
-        const savedMessages = localStorage.getItem("messages");
+        const u = localStorage.getItem("username");
+        const t = localStorage.getItem("targetUser");
+        const m = localStorage.getItem("messages");
 
-        if (savedUsername) setUsername(savedUsername);
-        if (savedTargetUser) setTargetUser(savedTargetUser);
-        if (savedMessages) setMessages(JSON.parse(savedMessages));
+        if (u) setUsername(u);
+        if (t) setTargetUser(t);
+        if (m) setMessages(JSON.parse(m));
     }, []);
 
-    /* ===========================
-       SAVE TO LOCAL STORAGE
-    ============================ */
     useEffect(() => {
         if (username) localStorage.setItem("username", username);
         validateUsers();
@@ -51,60 +49,7 @@ export default function Video() {
         localStorage.setItem("messages", JSON.stringify(messages));
     }, [messages]);
 
-    /* ===========================
-       AUTO SCROLL CHAT
-    ============================ */
-    useEffect(() => {
-        if (chatBoxRef.current) {
-            chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
-        }
-    }, [messages]);
-
-
-    /* ===========================
-      DISCONNECT CALL
-   ============================ */
-    useEffect(() => {
-        if (!socketRef.current) return;
-
-        socketRef.current.on("call-ended", () => {
-            disconnectCall();
-        });
-
-        return () => {
-            socketRef.current.off("call-ended");
-        };
-    }, []);
-
-    const disconnectCall = () => {
-        setInCall(false);
-        if (peerRef.current) {
-            peerRef.current.close();
-            peerRef.current = null;
-        }
-
-        if (localVideo.current?.srcObject) {
-            localVideo.current.srcObject.getTracks().forEach(track => track.stop());
-            localVideo.current.srcObject = null;
-        }
-
-        if (remoteVideo.current?.srcObject) {
-            remoteVideo.current.srcObject.getTracks().forEach(track => track.stop());
-            remoteVideo.current.srcObject = null;
-        }
-
-        if (socketRef.current) {
-            socketRef.current.emit("call-ended", { to: targetUser });
-        }
-        setMessages(prev => [
-            ...prev,
-            { from: "System", text: "Call disconnected" }
-        ]);
-    };
-
-    /* ===========================
-        VALIDATION
-     ============================ */
+    /* ================= VALIDATION ================= */
     const validateUsers = () => {
         if (!username || !targetUser) {
             setError("Please select both users before connecting or calling.");
@@ -114,22 +59,20 @@ export default function Video() {
         return true;
     };
 
-    /* ===========================
-       CONNECT & CALL
-    ============================ */
+    /* ================= TOAST ================= */
+    const showToast = (msg) => {
+        setToast(msg);
+        setTimeout(() => setToast(""), 5000);
+    };
 
-
-    /* ---------------- SOCKET ---------------- */
+    /* ================= CONNECT ================= */
     function connect() {
         if (!validateUsers()) return;
+
         socketRef.current = new WebSocket("https://chat-be-2wla.onrender.com");
 
         socketRef.current.onopen = () => {
-            socketRef.current.send(JSON.stringify({
-                type: "join",
-                username
-            }));
-
+            socketRef.current.send(JSON.stringify({ type: "join", username }));
             showToast(`🟢 ${username} is online`);
         };
 
@@ -142,7 +85,8 @@ export default function Video() {
                     break;
 
                 case "offer":
-                    await handleOffer(data);
+                    setIncomingCall({ from: data.from, offer: data.offer });
+                    showToast(`📞 Incoming call from ${data.from}`);
                     break;
 
                 case "answer":
@@ -153,19 +97,18 @@ export default function Video() {
                     await peerRef.current.addIceCandidate(data.candidate);
                     break;
 
+                case "call-rejected":
+                    showToast("❌ Call rejected");
+                    disconnectCall();
+                    break;
+
                 default:
                     break;
             }
         };
     }
 
-    /* ---------------- TOAST ---------------- */
-    function showToast(msg) {
-        setToast(msg);
-        setTimeout(() => setToast(""), 10000);
-    }
-
-    /* ---------------- CHAT ---------------- */
+    /* ================= CHAT ================= */
     function sendChat() {
         if (!chatInput) return;
 
@@ -180,47 +123,40 @@ export default function Video() {
         setChatInput("");
     }
 
-
-
-    /* ---------------- PEER ---------------- */
+    /* ================= PEER ================= */
     function createPeer() {
         peerRef.current = new RTCPeerConnection({
             iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
         });
 
-        peerRef.current.onicecandidate = (event) => {
-            if (event.candidate) {
+        peerRef.current.onicecandidate = (e) => {
+            if (e.candidate) {
                 socketRef.current.send(JSON.stringify({
                     type: "ice-candidate",
                     to: targetUser,
-                    candidate: event.candidate
+                    candidate: e.candidate
                 }));
             }
         };
 
-        peerRef.current.ontrack = (event) => {
-            remoteVideo.current.srcObject = event.streams[0];
+        peerRef.current.ontrack = (e) => {
+            remoteVideo.current.srcObject = e.streams[0];
         };
     }
 
-    /* ---------------- MEDIA ---------------- */
     async function getMedia() {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true
-        });
-
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         localVideo.current.srcObject = stream;
-        stream.getTracks().forEach(track =>
-            peerRef.current.addTrack(track, stream)
-        );
+        stream.getTracks().forEach(t => peerRef.current.addTrack(t, stream));
     }
 
-    /* ---------------- CALL ---------------- */
+    /* ================= START CALL ================= */
     async function startCall() {
         if (!validateUsers()) return;
+
         setInCall(true);
         showToast("📞 Calling...");
+
         createPeer();
         await getMedia();
 
@@ -233,17 +169,18 @@ export default function Video() {
             to: targetUser,
             offer
         }));
-
     }
 
-    async function handleOffer(data) {
-        setTargetUser(data.from);
-        showToast(`📞 Incoming call from ${data.from}`);
+    /* ================= ACCEPT / REJECT ================= */
+    async function acceptCall() {
+        setTargetUser(incomingCall.from);
+        setIncomingCall(null);
+        setInCall(true);
 
         createPeer();
         await getMedia();
 
-        await peerRef.current.setRemoteDescription(data.offer);
+        await peerRef.current.setRemoteDescription(incomingCall.offer);
 
         const answer = await peerRef.current.createAnswer();
         await peerRef.current.setLocalDescription(answer);
@@ -251,63 +188,91 @@ export default function Video() {
         socketRef.current.send(JSON.stringify({
             type: "answer",
             from: username,
-            to: data.from,
+            to: incomingCall.from,
             answer
         }));
     }
 
-    /* ---------------- UI ---------------- */
+    function rejectCall() {
+        socketRef.current.send(JSON.stringify({
+            type: "call-rejected",
+            from: username,
+            to: incomingCall.from
+        }));
+
+        setIncomingCall(null);
+        showToast("❌ Call rejected");
+    }
+
+    /* ================= DISCONNECT ================= */
+    function disconnectCall() {
+        setInCall(false);
+        setIncomingCall(null);
+
+        peerRef.current?.close();
+        peerRef.current = null;
+
+        [localVideo, remoteVideo].forEach(v => {
+            if (v.current?.srcObject) {
+                v.current.srcObject.getTracks().forEach(t => t.stop());
+                v.current.srcObject = null;
+            }
+        });
+    }
+
+    /* ================= UI ================= */
     return (
         <div className="app">
             {toast && <div className="toast">{toast}</div>}
 
-            <h2>🎥 Sandhya Video Chat App</h2>
+            {/* INCOMING CALL POPUP */}
+            {incomingCall && (
+                <div className="call-popup-overlay">
+                    <div className="call-popup">
+                        <h3>📲 Incoming…</h3>
+                        <p>{incomingCall.from} is calling</p>
+                        <div className="call-actions">
+                            <button className="accept" onClick={acceptCall}>🟢 Accept</button>
+                            <button className="reject" onClick={rejectCall}>🔴 Decline</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <h2>🤝Nexora</h2>
 
             <div className="top-controls">
-                <select
-                    value={username}
-                    onChange={(e) => {
-                        if (e.target.value === "add") {
-                            const name = prompt("Enter your name");
-                            if (name) setUsername(name);
-                        } else {
-                            setUsername(e.target.value);
-                        }
-                    }}
-                >
-                    <option value="">👤 Select your name</option>
-                    <option value="Virendra">Virendra</option>
-                    <option value="Sandhya">Sandhya</option>
-                    <option value="Suraj">Suraj</option>
-                    <option value="add">➕ Add name</option>
+                <select value={username} onChange={e => setUsername(e.target.value)}>
+                    <option value="">Your name</option>
+                    <option>Virendra</option>
+                    <option>Abhi</option>
+                    <option>Suraj</option>
+                    <option>Rohit</option>
+                    <option>Monu</option>
+                    <option>Chandu</option>
+                    <option>Raja</option>
                 </select>
 
-                <select
-                    value={targetUser}
-                    onChange={(e) => {
-                        if (e.target.value === "add") {
-                            const name = prompt("Enter peer name");
-                            if (name) setTargetUser(name);
-                        } else {
-                            setTargetUser(e.target.value);
-                        }
-                    }}
-                >
-                    <option value="">🎯 Select peer name</option>
-                    <option value="Virendra">Virendra</option>
-                    <option value="Sandhya">Sandhya</option>
-                    <option value="Suraj">Suraj</option>
-                    <option value="add">➕ Add name</option>
+                <select value={targetUser} onChange={e => setTargetUser(e.target.value)}>
+                    <option value="">Peer name</option>
+                    <option>Virendra</option>
+                    <option>Abhi</option>
+                    <option>Suraj</option>
+                    <option>Rohit</option>
+                    <option>Monu</option>
+                    <option>Chandu</option>
+                    <option>Raja</option>
+
                 </select>
 
-                <button onClick={connect}>Connect</button>
+                <button onClick={connect}>💬</button>
                 <button onClick={startCall}>Call</button>
-                <button onClick={disconnectCall}>Disconnect</button>
+                <button onClick={disconnectCall}>📞</button>
             </div>
 
+            {error && <div className="error-msg">{error}</div>}
 
-            <div className="main">
-                <div className="videos">
+           <div className="videos">
                     {inCall && (
                         <div className="video-section">
                             <video ref={remoteVideo} className="remote" autoPlay />
@@ -316,34 +281,21 @@ export default function Video() {
                     )}
                 </div>
 
-                <div className="chat">
-                    {/* <h3>💬 Chat</h3> */}
-                    {error && <div className="error-msg">{error}</div>}
-
-                    <div className="chat-box" ref={chatBoxRef}>
-                        {messages.slice(-5).map((m, i) => (
-                            <div
-                                key={i}
-                                className={m.from === "Me" ? "msg me" : "msg peer"}
-                            >
-                                <b>{m.from}</b>: {m.text}
-                            </div>
-                        ))}
+            <div className="chat-box" ref={chatBoxRef}>
+                {messages.map((m, i) => (
+                    <div key={i} className={m.from === "Me" ? "msg me" : "msg peer"}>
+                        <b>{m.from}</b>: {m.text}
                     </div>
-
-
-                    {/* <div className="chat-input">
-                        <input
-                            placeholder="Type a message 😊"
-                            value={chatInput}
-                            onChange={e => setChatInput(e.target.value)}
-                            onKeyDown={e => e.key === "Enter" && sendChat()}
-                        />
-                        <button className="chat-button" onClick={sendChat}>Send 🚀</button>
-                    </div> */}
-
-                </div>
-                <div class="chat-input-bar">
+                ))}
+            </div>
+            {/* <div className="chat-input-section">
+                <input
+                    placeholder="Type message"
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && sendChat()}
+                /> */}
+                  <div class="chat-input-bar">
                     <div class="input-wrapper">
                         <button class="icon-btn">📎</button>
                         <input placeholder="Type a message 😊"
@@ -353,12 +305,12 @@ export default function Video() {
                         <button class="icon-btn">📷</button>
                     </div>
                     <button class="send-circle chat-button" id="sendBtn" onClick={sendChat}>
-                        <svg viewBox="0 0 24 24" width="24" height="24" fill="white">
-                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
-                        </svg>
-                    </button>
-                </div>
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="white">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                    </svg>
+                </button>
             </div>
         </div>
+        
     );
 }

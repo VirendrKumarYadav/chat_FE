@@ -139,3 +139,51 @@ body {
   display: flex;
   flex-direction: column;
 }
+
+.call-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.call-popup {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  width: 280px;
+  text-align: center;
+}
+
+.call-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.call-actions button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.call-actions .accept {
+  background: #16a34a;
+  color: white;
+}
+
+.call-actions .reject {
+  background: #dc2626;
+  color: white;
+}
+/* ------------------- MOBILE MEDIA QUERIES ------------------- */
+@media screen and (max-width: 768px) {
+  .call-popup {
+    width: 90%;
+  }
+}
